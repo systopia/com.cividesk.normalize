@@ -231,6 +231,8 @@ class CRM_Utils_Normalize {
       'US' => '/^(\d{5})(-[0-9]{4})?$/i',
       'FR' => '/^(\d{5})$/i',
       'NL' => '/^(\d{4})\s*([a-z]{2})$/i',
+      'AT' => '/^(\d{4})$/',
+      'DE' => '/^(\d{5})$/',
     );
     // These will be all-capped
     $directionals = array(
