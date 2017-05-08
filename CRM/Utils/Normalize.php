@@ -208,7 +208,45 @@ class CRM_Utils_Normalize {
         $phone['phone'] = $phoneUtil->format($phoneProto, PhoneNumberFormat::INTERNATIONAL);
       }
     }
+    // Get phone number type and map to CiviCRM types
+    $numberType = CRM_Utils_Normalize::mapPhoneNumberTypeToCivi($phoneUtil->getNumberType($phoneProto), $phone['phone_type_id']);
+    if ($numberType) {
+      $phone['phone_type_id'] = $numberType;
+    };
+
     return TRUE;
+  }
+
+  /**
+   * Try and map PhoneNumberType to CiviCRM phone type.  Return FALSE if we don't have a match
+   *
+   * @param $phoneNumberType
+   * @return bool|int
+   */
+  function mapPhoneNumberTypeToCivi($phoneNumberType, $civiPhoneType=1) {
+    // (returns array 1=>Phone,2=>Mobile etc) $phoneTypes = CRM_Core_PseudoConstant::get('CRM_Core_DAO_Phone', 'phone_type_id');
+    switch ($phoneNumberType) {
+      case \libphonenumber\PhoneNumberType::FIXED_LINE:
+        return 1;
+      case \libphonenumber\PhoneNumberType::FIXED_LINE_OR_MOBILE:
+        // If it could be either, keep the civi type if set to fixed or mobile,
+        // otherwise we'll select fixed_line.
+        if ($civiPhoneType == 1 || $civiPhoneType == 2) {
+          return $civiPhoneType;
+        }
+        else {
+          return 1;
+        }
+      case \libphonenumber\PhoneNumberType::MOBILE:
+        return 2;
+      //CiviCRM: Fax 3
+      case \libphonenumber\PhoneNumberType::PAGER:
+        return 4;
+      case \libphonenumber\PhoneNumberType::VOICEMAIL:
+        return 5;
+      default:
+        return FALSE;
+    }
   }
 
   /**
