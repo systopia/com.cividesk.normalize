@@ -110,7 +110,7 @@ class CRM_Utils_Normalize {
     );
     // These will be Firstcaped with a dot at the end
     $orgstatusSpecial = array( 'inc', 'co', 'corp', 'ltd' );
-    
+
     $delimiters = array( "-", ".", "D'", "O'", "Mc", " ",);
 
     if (CRM_Utils_Array::value('contact_FullFirst', $this->_settings)) {
@@ -134,14 +134,14 @@ class CRM_Utils_Normalize {
                 // special status only need first letter to be capitalize
                 $word = str_replace(array('.'), '', strtolower($word)) . '.';
               } else if (in_array(strtolower($word), $orgHandles)) {
-                 // lower case few matching word for Organization contact
-                 $word = strtolower($word);
-               }
+                // lower case few matching word for Organization contact
+                $word = strtolower($word);
+              }
             } elseif ( CRM_Utils_Array::value('contact_type', $contact) == 'Individual') {
-               // lower case few matching word for individual contact
-               if (in_array(strtolower($word), $handles)) {
-                 $word = strtolower($word);
-               }
+              // lower case few matching word for individual contact
+              if (in_array(strtolower($word), $handles)) {
+                $word = strtolower($word);
+              }
             }
             if (!in_array($word, $handles) && !in_array($word, $orgHandles)) {
               $word = ucfirst($word);
@@ -157,7 +157,7 @@ class CRM_Utils_Normalize {
           }
         }
         $contact[$field] = $name;
-        
+
       }
     }
     if (CRM_Utils_Array::value('contact_OrgCaps', $this->_settings)) {
@@ -245,7 +245,7 @@ class CRM_Utils_Normalize {
       }
     }
     if ($value = CRM_Utils_Array::value('address_StreetCaps', $this->_settings)) {
-      foreach( array('street_address','supplemental_address_1', 'supplemental_address_2') as $name) { 
+      foreach( array('street_address','supplemental_address_1', 'supplemental_address_2') as $name) {
         $addressValue = CRM_Utils_Array::value($name, $address);
         if ($value == 1 && $addressValue) {
           $address[$name] = strtoupper($addressValue);
@@ -261,7 +261,7 @@ class CRM_Utils_Normalize {
     }
     if (CRM_Utils_Array::value('address_Zip', $this->_settings)) {
       if (($zip = CRM_Utils_Array::value('postal_code', $address))
-          && ($cid = CRM_Utils_Array::value('country_id', $address))) {
+        && ($cid = CRM_Utils_Array::value('country_id', $address))) {
         $codes = CRM_Core_PseudoConstant::countryIsoCode();
         if ($regex = CRM_Utils_Array::value($codes[$cid], $zip_formats)) {
           if (!preg_match($regex, $zip, $matches)) {
