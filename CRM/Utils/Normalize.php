@@ -286,7 +286,7 @@ class CRM_Utils_Normalize {
     return $this->_phoneFields;
   }
 
-  static function processNormalization($fromContactId, $toContactId) {
+  static function processNormalization($fromContactId, $toContactId, $dryRun=FALSE) {
     $processInfo = array('name' => 0, 'phone' => 0, 'address' => 0);
     if (empty($fromContactId) || empty($toContactId)) {
       return $processInfo;
@@ -325,11 +325,18 @@ class CRM_Utils_Normalize {
           if (!empty($formatDiff)) {
             $formattedNameValues['id'] = $formattedNameValues['contact_id'] = $orgContactValues['id'];
             $formattedNameValues['contact_type'] = $orgContactValues['contact_type'];
-            $contactUpdated = CRM_Contact_BAO_Contact::add($formattedNameValues);
-            if ($contactUpdated->id) {
-              $formattedContactIds[$contactUpdated->id] = $contactUpdated->id;
+            if ($dryRun) {
+              // Log change
+              CRM_Utils_Normalize::logNormalization('name', $orgContactValues, $formattedNameValues);
+              $formattedContactIds[$contactId] = $contactId;
             }
-            $contactUpdated->free();
+            else {
+              $contactUpdated = CRM_Contact_BAO_Contact::add($formattedNameValues);
+              if ($contactUpdated->id) {
+                $formattedContactIds[$contactUpdated->id] = $contactUpdated->id;
+              }
+              $contactUpdated->free();
+            }
           }
         }
 
@@ -348,11 +355,18 @@ class CRM_Utils_Normalize {
             //do check for formatted difference, than only update.
             $formattedDiff = array_diff_assoc($orgPhoneValues, $formattedPhoneValues);
             if (!empty($formattedDiff)) {
-              $phoneUpdated = CRM_Core_BAO_Phone::add($formattedPhoneValues);
-              if ($phoneUpdated->id) {
-                $formattedPhoneIds[$phoneUpdated->id] = $phoneUpdated->id;
+              if ($dryRun) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('phone', $orgPhoneValues, $formattedPhoneValues);
+                $formattedPhoneIds[$orgPhoneValues['id']] = $orgPhoneValues['id'];
               }
-              $phoneUpdated->free();
+              else {
+                $phoneUpdated = CRM_Core_BAO_Phone::add($formattedPhoneValues);
+                if ($phoneUpdated->id) {
+                  $formattedPhoneIds[$phoneUpdated->id] = $phoneUpdated->id;
+                }
+                $phoneUpdated->free();
+              }
             }
           }
         }
@@ -372,11 +386,18 @@ class CRM_Utils_Normalize {
             //do check for formatted difference, than only update.
             $formattedDiff = array_diff($orgAddressValues, $formattedAddressValues);
             if (!empty($formattedDiff)) {
-              $addressUpdated = CRM_Core_BAO_Address::add($formattedAddressValues, FALSE);
-              if ($addressUpdated->id) {
-                $formattedAddressIds[$addressUpdated->id] = $addressUpdated->id;
+              if ($dryRun) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('address', $orgAddressValues, $formattedAddressValues);
+                $formattedAddressIds[$orgAddressValues['id']] = $orgAddressValues['id'];
               }
-              $addressUpdated->free();
+              else {
+                $addressUpdated = CRM_Core_BAO_Address::add($formattedAddressValues, FALSE);
+                if ($addressUpdated->id) {
+                  $formattedAddressIds[$addressUpdated->id] = $addressUpdated->id;
+                }
+                $addressUpdated->free();
+              }
             }
           }
         }
@@ -391,5 +412,16 @@ class CRM_Utils_Normalize {
     );
 
     return $processInfo;
+  }
+
+  /**
+   * Function to log normalization changes
+   * Currently just writes out to debug log.
+   * @param $type : eg. "address", "phone", "name"
+   * @param $origValues : array of original values
+   * @param $formattedValues : array of modified values
+   */
+  static function logNormalization($type, $origValues, $formattedValues) {
+    CRM_Core_Error::debug_log_message($type . 'Original: '. print_r($origValues,true) . 'Modified: '. print_r($formattedValues, true));
   }
 }
