@@ -286,7 +286,7 @@ class CRM_Utils_Normalize {
     return $this->_phoneFields;
   }
 
-  static function processNormalization($fromContactId, $toContactId, $dryRun=FALSE) {
+  static function processNormalization($fromContactId, $toContactId, $dryRun=FALSE, $logFile=NULL) {
     $processInfo = array('name' => 0, 'phone' => 0, 'address' => 0);
     if (empty($fromContactId) || empty($toContactId)) {
       return $processInfo;
@@ -326,8 +326,7 @@ class CRM_Utils_Normalize {
             $formattedNameValues['id'] = $formattedNameValues['contact_id'] = $orgContactValues['id'];
             $formattedNameValues['contact_type'] = $orgContactValues['contact_type'];
             if ($dryRun) {
-              // Log change
-              CRM_Utils_Normalize::logNormalization('name', $orgContactValues, $formattedNameValues);
+              // Record for stats
               $formattedContactIds[$contactId] = $contactId;
             }
             else {
@@ -336,6 +335,10 @@ class CRM_Utils_Normalize {
                 $formattedContactIds[$contactUpdated->id] = $contactUpdated->id;
               }
               $contactUpdated->free();
+            }
+            if (!empty($logFile)) {
+              // Log change
+              CRM_Utils_Normalize::logNormalization('name', $orgContactValues, $formattedNameValues, $logFile);
             }
           }
         }
@@ -356,8 +359,7 @@ class CRM_Utils_Normalize {
             $formattedDiff = array_diff_assoc($orgPhoneValues, $formattedPhoneValues);
             if (!empty($formattedDiff)) {
               if ($dryRun) {
-                // Log change
-                CRM_Utils_Normalize::logNormalization('phone', $orgPhoneValues, $formattedPhoneValues);
+                // Record for stats
                 $formattedPhoneIds[$orgPhoneValues['id']] = $orgPhoneValues['id'];
               }
               else {
@@ -366,6 +368,10 @@ class CRM_Utils_Normalize {
                   $formattedPhoneIds[$phoneUpdated->id] = $phoneUpdated->id;
                 }
                 $phoneUpdated->free();
+              }
+              if (!empty($logFile)) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('phone', $orgPhoneValues, $formattedPhoneValues, $logFile);
               }
             }
           }
@@ -387,8 +393,7 @@ class CRM_Utils_Normalize {
             $formattedDiff = array_diff($orgAddressValues, $formattedAddressValues);
             if (!empty($formattedDiff)) {
               if ($dryRun) {
-                // Log change
-                CRM_Utils_Normalize::logNormalization('address', $orgAddressValues, $formattedAddressValues);
+                // Record for stats
                 $formattedAddressIds[$orgAddressValues['id']] = $orgAddressValues['id'];
               }
               else {
@@ -397,6 +402,10 @@ class CRM_Utils_Normalize {
                   $formattedAddressIds[$addressUpdated->id] = $addressUpdated->id;
                 }
                 $addressUpdated->free();
+              }
+              if (!empty($logFile)) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('address', $orgAddressValues, $formattedAddressValues, $logFile);
               }
             }
           }
@@ -416,12 +425,38 @@ class CRM_Utils_Normalize {
 
   /**
    * Function to log normalization changes
+   * CSV Format:
+   * contactid,phone,field1,old,new,field2,old,new,field3...
+   * contactid,address,...
+   * contactid,name,...
+   *
    * Currently just writes out to debug log.
    * @param $type : eg. "address", "phone", "name"
    * @param $origValues : array of original values
    * @param $formattedValues : array of modified values
    */
-  static function logNormalization($type, $origValues, $formattedValues) {
-    CRM_Core_Error::debug_log_message($type . 'Original: '. print_r($origValues,true) . 'Modified: '. print_r($formattedValues, true));
+  static function logNormalization($type, $origValues, $formattedValues, $logFile) {
+    // For some types, eg. name $formattedValues may only contain a subset of $origValues
+    // So we merge the arrays to get new values, old values:
+    // Take new values in merged array
+    $newValues = array_merge($origValues, $formattedValues);
+    // Take old values in merged array
+    $oldValues = array_merge($formattedValues, $origValues);
+    // Get all changed values
+    $newValuesChanged = array_diff($newValues, $oldValues);
+    // contactid,type
+    $csv = $formattedValues['contact_id'].','.$type;
+    foreach($newValuesChanged as $field => $value) {
+      // Build fields string
+      // Format is field,oldvalue,newvalue
+      $csv .= ','.$field.','.$oldValues[$field].','.$value;
+    }
+
+    // Write to a file in ConfigAndLogDir
+    $config = CRM_Core_Config::singleton();
+    if (!empty($config->configAndLogDir)) {
+      $file = $config->configAndLogDir ."/$logFile";
+      file_put_contents($file, $csv.PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
   }
 }

@@ -180,7 +180,7 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     }
   } //end of function
 
-  static function getRunner($skipEndUrl = FALSE, $fromContactId, $toContactId, $batchSize, $dryRun=FALSE) {
+  static function getRunner($skipEndUrl = FALSE, $fromContactId, $toContactId, $batchSize, $dryRun=FALSE, $logFile = NULL) {
     // Setup the Queue
     $queue = CRM_Queue_Service::singleton()->create(array(
       'name'  => self::QUEUE_NAME,
@@ -196,7 +196,7 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
 
       $task  = new CRM_Queue_Task(
         array ('CRM_Admin_Form_Setting_Normalize', 'normalizeContacts'),
-        array($startId, $endId, $dryRun),
+        array($startId, $endId, $dryRun, $logFile),
         "Preparing queue for $title"
       );
 
@@ -220,9 +220,9 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     return $runner;
   }
 
-  static function normalizeContacts(CRM_Queue_TaskContext $ctx, $fromId, $toId, $dryRun=FALSE) {
+  static function normalizeContacts(CRM_Queue_TaskContext $ctx, $fromId, $toId, $dryRun=FALSE, $logFile=NULL) {
     $normalization  = CRM_Utils_Normalize::singleton();
-    $processingInfo = $normalization->processNormalization($fromId, $toId, $dryRun);
+    $processingInfo = $normalization->processNormalization($fromId, $toId, $dryRun, $logFile);
     $updateInfo = array('contact' => count($processingInfo['name']), 'phone' => count($processingInfo['phone']), 'address'=> count($processingInfo['address']));
     self::updatePushStats($updateInfo);
     return CRM_Queue_Task::TASK_SUCCESS;
