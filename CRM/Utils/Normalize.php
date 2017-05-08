@@ -110,7 +110,7 @@ class CRM_Utils_Normalize {
     );
     // These will be Firstcaped with a dot at the end
     $orgstatusSpecial = array( 'inc', 'co', 'corp', 'ltd' );
-    
+
     $delimiters = array( "-", ".", "D'", "O'", "Mc", " ",);
 
     if (CRM_Utils_Array::value('contact_FullFirst', $this->_settings)) {
@@ -134,14 +134,14 @@ class CRM_Utils_Normalize {
                 // special status only need first letter to be capitalize
                 $word = str_replace(array('.'), '', strtolower($word)) . '.';
               } else if (in_array(strtolower($word), $orgHandles)) {
-                 // lower case few matching word for Organization contact
-                 $word = strtolower($word);
-               }
+                // lower case few matching word for Organization contact
+                $word = strtolower($word);
+              }
             } elseif ( CRM_Utils_Array::value('contact_type', $contact) == 'Individual') {
-               // lower case few matching word for individual contact
-               if (in_array(strtolower($word), $handles)) {
-                 $word = strtolower($word);
-               }
+              // lower case few matching word for individual contact
+              if (in_array(strtolower($word), $handles)) {
+                $word = strtolower($word);
+              }
             }
             if (!in_array($word, $handles) && !in_array($word, $orgHandles)) {
               $word = ucfirst($word);
@@ -157,7 +157,7 @@ class CRM_Utils_Normalize {
           }
         }
         $contact[$field] = $name;
-        
+
       }
     }
     if (CRM_Utils_Array::value('contact_OrgCaps', $this->_settings)) {
@@ -208,7 +208,45 @@ class CRM_Utils_Normalize {
         $phone['phone'] = $phoneUtil->format($phoneProto, PhoneNumberFormat::INTERNATIONAL);
       }
     }
+    // Get phone number type and map to CiviCRM types
+    $numberType = CRM_Utils_Normalize::mapPhoneNumberTypeToCivi($phoneUtil->getNumberType($phoneProto), $phone['phone_type_id']);
+    if ($numberType) {
+      $phone['phone_type_id'] = $numberType;
+    };
+
     return TRUE;
+  }
+
+  /**
+   * Try and map PhoneNumberType to CiviCRM phone type.  Return FALSE if we don't have a match
+   *
+   * @param $phoneNumberType
+   * @return bool|int
+   */
+  function mapPhoneNumberTypeToCivi($phoneNumberType, $civiPhoneType=1) {
+    // (returns array 1=>Phone,2=>Mobile etc) $phoneTypes = CRM_Core_PseudoConstant::get('CRM_Core_DAO_Phone', 'phone_type_id');
+    switch ($phoneNumberType) {
+      case \libphonenumber\PhoneNumberType::FIXED_LINE:
+        return 1;
+      case \libphonenumber\PhoneNumberType::FIXED_LINE_OR_MOBILE:
+        // If it could be either, keep the civi type if set to fixed or mobile,
+        // otherwise we'll select fixed_line.
+        if ($civiPhoneType == 1 || $civiPhoneType == 2) {
+          return $civiPhoneType;
+        }
+        else {
+          return 1;
+        }
+      case \libphonenumber\PhoneNumberType::MOBILE:
+        return 2;
+      //CiviCRM: Fax 3
+      case \libphonenumber\PhoneNumberType::PAGER:
+        return 4;
+      case \libphonenumber\PhoneNumberType::VOICEMAIL:
+        return 5;
+      default:
+        return FALSE;
+    }
   }
 
   /**
@@ -245,7 +283,7 @@ class CRM_Utils_Normalize {
       }
     }
     if ($value = CRM_Utils_Array::value('address_StreetCaps', $this->_settings)) {
-      foreach( array('street_address','supplemental_address_1', 'supplemental_address_2') as $name) { 
+      foreach( array('street_address','supplemental_address_1', 'supplemental_address_2') as $name) {
         $addressValue = CRM_Utils_Array::value($name, $address);
         if ($value == 1 && $addressValue) {
           $address[$name] = strtoupper($addressValue);
@@ -261,7 +299,7 @@ class CRM_Utils_Normalize {
     }
     if (CRM_Utils_Array::value('address_Zip', $this->_settings)) {
       if (($zip = CRM_Utils_Array::value('postal_code', $address))
-          && ($cid = CRM_Utils_Array::value('country_id', $address))) {
+        && ($cid = CRM_Utils_Array::value('country_id', $address))) {
         $codes = CRM_Core_PseudoConstant::countryIsoCode();
         if ($regex = CRM_Utils_Array::value($codes[$cid], $zip_formats)) {
           if (!preg_match($regex, $zip, $matches)) {
@@ -286,7 +324,7 @@ class CRM_Utils_Normalize {
     return $this->_phoneFields;
   }
 
-  static function processNormalization($fromContactId, $toContactId) {
+  static function processNormalization($fromContactId, $toContactId, $dryRun=FALSE, $logFile=NULL) {
     $processInfo = array('name' => 0, 'phone' => 0, 'address' => 0);
     if (empty($fromContactId) || empty($toContactId)) {
       return $processInfo;
@@ -325,11 +363,21 @@ class CRM_Utils_Normalize {
           if (!empty($formatDiff)) {
             $formattedNameValues['id'] = $formattedNameValues['contact_id'] = $orgContactValues['id'];
             $formattedNameValues['contact_type'] = $orgContactValues['contact_type'];
-            $contactUpdated = CRM_Contact_BAO_Contact::add($formattedNameValues);
-            if ($contactUpdated->id) {
-              $formattedContactIds[$contactUpdated->id] = $contactUpdated->id;
+            if ($dryRun) {
+              // Record for stats
+              $formattedContactIds[$contactId] = $contactId;
             }
-            $contactUpdated->free();
+            else {
+              $contactUpdated = CRM_Contact_BAO_Contact::add($formattedNameValues);
+              if ($contactUpdated->id) {
+                $formattedContactIds[$contactUpdated->id] = $contactUpdated->id;
+              }
+              $contactUpdated->free();
+            }
+            if (!empty($logFile)) {
+              // Log change
+              CRM_Utils_Normalize::logNormalization('name', $orgContactValues, $formattedNameValues, $logFile);
+            }
           }
         }
 
@@ -348,11 +396,21 @@ class CRM_Utils_Normalize {
             //do check for formatted difference, than only update.
             $formattedDiff = array_diff_assoc($orgPhoneValues, $formattedPhoneValues);
             if (!empty($formattedDiff)) {
-              $phoneUpdated = CRM_Core_BAO_Phone::add($formattedPhoneValues);
-              if ($phoneUpdated->id) {
-                $formattedPhoneIds[$phoneUpdated->id] = $phoneUpdated->id;
+              if ($dryRun) {
+                // Record for stats
+                $formattedPhoneIds[$orgPhoneValues['id']] = $orgPhoneValues['id'];
               }
-              $phoneUpdated->free();
+              else {
+                $phoneUpdated = CRM_Core_BAO_Phone::add($formattedPhoneValues);
+                if ($phoneUpdated->id) {
+                  $formattedPhoneIds[$phoneUpdated->id] = $phoneUpdated->id;
+                }
+                $phoneUpdated->free();
+              }
+              if (!empty($logFile)) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('phone', $orgPhoneValues, $formattedPhoneValues, $logFile);
+              }
             }
           }
         }
@@ -372,11 +430,21 @@ class CRM_Utils_Normalize {
             //do check for formatted difference, than only update.
             $formattedDiff = array_diff($orgAddressValues, $formattedAddressValues);
             if (!empty($formattedDiff)) {
-              $addressUpdated = CRM_Core_BAO_Address::add($formattedAddressValues, FALSE);
-              if ($addressUpdated->id) {
-                $formattedAddressIds[$addressUpdated->id] = $addressUpdated->id;
+              if ($dryRun) {
+                // Record for stats
+                $formattedAddressIds[$orgAddressValues['id']] = $orgAddressValues['id'];
               }
-              $addressUpdated->free();
+              else {
+                $addressUpdated = CRM_Core_BAO_Address::add($formattedAddressValues, FALSE);
+                if ($addressUpdated->id) {
+                  $formattedAddressIds[$addressUpdated->id] = $addressUpdated->id;
+                }
+                $addressUpdated->free();
+              }
+              if (!empty($logFile)) {
+                // Log change
+                CRM_Utils_Normalize::logNormalization('address', $orgAddressValues, $formattedAddressValues, $logFile);
+              }
             }
           }
         }
@@ -391,5 +459,42 @@ class CRM_Utils_Normalize {
     );
 
     return $processInfo;
+  }
+
+  /**
+   * Function to log normalization changes
+   * CSV Format:
+   * contactid,phone,field1,old,new,field2,old,new,field3...
+   * contactid,address,...
+   * contactid,name,...
+   *
+   * Currently just writes out to debug log.
+   * @param $type : eg. "address", "phone", "name"
+   * @param $origValues : array of original values
+   * @param $formattedValues : array of modified values
+   */
+  static function logNormalization($type, $origValues, $formattedValues, $logFile) {
+    // For some types, eg. name $formattedValues may only contain a subset of $origValues
+    // So we merge the arrays to get new values, old values:
+    // Take new values in merged array
+    $newValues = array_merge($origValues, $formattedValues);
+    // Take old values in merged array
+    $oldValues = array_merge($formattedValues, $origValues);
+    // Get all changed values
+    $newValuesChanged = array_diff($newValues, $oldValues);
+    // contactid,type
+    $csv = $formattedValues['contact_id'].','.$type;
+    foreach($newValuesChanged as $field => $value) {
+      // Build fields string
+      // Format is field,oldvalue,newvalue
+      $csv .= ','.$field.','.$oldValues[$field].','.$value;
+    }
+
+    // Write to a file in ConfigAndLogDir
+    $config = CRM_Core_Config::singleton();
+    if (!empty($config->configAndLogDir)) {
+      $file = $config->configAndLogDir ."/$logFile";
+      file_put_contents($file, $csv.PHP_EOL, FILE_APPEND | LOCK_EX);
+    }
   }
 }

@@ -105,6 +105,12 @@
               </td>
               <td>{$form.batch_size.html}</td>
           </tr>
+          <tr class="crm-cividesk-normalize-form-block">
+            <td class="label">
+              {$form.dry_run.label}
+            </td>
+            <td>{$form.dry_run.html}</td>
+          </tr>
           {if $smarty.get.state eq 'done'}
           <tr class="crm-cividesk-normalize-form-block">
               <td colspan="2">

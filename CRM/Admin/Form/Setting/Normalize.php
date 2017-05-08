@@ -93,6 +93,10 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     $this->addElement('text', "to_contact_id", ts("To Contact ID"));
     $this->addElement('text', "from_contact_id", ts("From Contact ID"));
     $this->addElement('text', "batch_size", ts("Batch Size..."));
+    $this->add('checkbox',
+      'dry_run',
+      ts('Dry Run (Don\'t actually make any changes)')
+    );
     $this->addFormRule(array('CRM_Admin_Form_Setting_Normalize', 'formRule'));    
     
     
@@ -148,11 +152,17 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
       $fromContactId = $params['from_contact_id'];
       $toContactId = $params['to_contact_id'];
       $batchSize = $params['batch_size'];
+      if (!empty($params['dry_run'])) {
+        $dryRun = TRUE;
+      }
+      else {
+        $dryRun = FALSE;
+      }
       if (empty($fromContactId) || empty($toContactId)) {
         CRM_Core_Session::setStatus(ts('No contact has been updated'));
         return true;
       }
-      $runner = self::getRunner( false, $fromContactId, $toContactId, $batchSize);
+      $runner = self::getRunner( false, $fromContactId, $toContactId, $batchSize, $dryRun);
       if ($runner) {
         // Run Everything in the Queue via the Web.
         $runner->runAllViaWeb();
@@ -170,7 +180,7 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     }
   } //end of function
 
-  static function getRunner($skipEndUrl = FALSE, $fromContactId, $toContactId, $batchSize) {
+  static function getRunner($skipEndUrl = FALSE, $fromContactId, $toContactId, $batchSize, $dryRun=FALSE, $logFile = NULL) {
     // Setup the Queue
     $queue = CRM_Queue_Service::singleton()->create(array(
       'name'  => self::QUEUE_NAME,
@@ -186,7 +196,7 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
 
       $task  = new CRM_Queue_Task(
         array ('CRM_Admin_Form_Setting_Normalize', 'normalizeContacts'),
-        array($startId, $endId, $title),
+        array($startId, $endId, $dryRun, $logFile),
         "Preparing queue for $title"
       );
 
@@ -210,9 +220,9 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     return $runner;
   }
 
-  static function normalizeContacts(CRM_Queue_TaskContext $ctx, $fromId, $toId) {
+  static function normalizeContacts(CRM_Queue_TaskContext $ctx, $fromId, $toId, $dryRun=FALSE, $logFile=NULL) {
     $normalization  = CRM_Utils_Normalize::singleton();
-    $processingInfo = $normalization->processNormalization($fromId, $toId);
+    $processingInfo = $normalization->processNormalization($fromId, $toId, $dryRun, $logFile);
     $updateInfo = array('contact' => count($processingInfo['name']), 'phone' => count($processingInfo['phone']), 'address'=> count($processingInfo['address']));
     self::updatePushStats($updateInfo);
     return CRM_Queue_Task::TASK_SUCCESS;
