@@ -11,3 +11,20 @@ It is configurable so you have the choice between multiple options for normalizi
 ## Configuration
 
 Settings are accessed from the 'Administer / Customize Data and Screens / Cividesk Normalize' menu.
+
+## API Functions
+### Contact.Normalize
+
+### Contact.Normalizerange
+This accepts the following parameters:
+* from_contact_id: First contact Id
+* to_contact_id: Last contact Id
+* batch_size: Batch size (min 1)
+* dry_run: Don't actually make any changes
+* log_file: If specified, changes will be logged as CSV to this file (saved in ConfigAndLog dir)
+
+Log file format is csv:
+```
+contactid,phone,field1,old,new,field2,old,new,field3...
+contactid,address,...
+```
