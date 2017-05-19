@@ -28,3 +28,6 @@ Log file format is csv:
 contactid,phone,field1,old,new,field2,old,new,field3...
 contactid,address,...
 ```
+
+### Notes
+When you run the normalize from the UI, the log file is fixed "normalize_contacts.csv" and will be overwritten each run.
