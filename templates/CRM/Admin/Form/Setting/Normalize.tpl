@@ -111,6 +111,12 @@
             </td>
             <td>{$form.dry_run.html}</td>
           </tr>
+          <tr class="crm-cividesk-normalize-form-block">
+            <td class="label">
+              {$form.log_file.label}
+            </td>
+            <td>{$form.log_file.html}</td>
+          </tr>
           {if $smarty.get.state eq 'done'}
           <tr class="crm-cividesk-normalize-form-block">
               <td colspan="2">
@@ -121,6 +127,9 @@
                       <tr><td>{ts}Phone{/ts}:</td><td>{$stats.phone}</td></tr>
                       <tr><td>{ts}Address{/ts}:</td><td>{$stats.address}</td></tr>
                   </table>
+                {if $smarty.get.log eq '1'}
+                  <div><a href="{crmURL p='civicrm/admin/setting/normalize' q='download=1'}" target="_blank">{ts}Download log file{/ts}</a></div>
+                {/if}
               </div>
               </td>
           </tr>

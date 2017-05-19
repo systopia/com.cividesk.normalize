@@ -25,6 +25,7 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
   const QUEUE_NAME = 'normalize-contact';
   const END_URL    = 'civicrm/admin/setting/normalize';
   const END_PARAMS = 'state=done';
+  const LOG_FILE = 'normalise_contacts.csv';
 
   function preProcess() {
     // Needs to be here as from is build before default values are set
@@ -35,10 +36,21 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     $config = CRM_Core_Config::singleton();
     $this->_country = $config->defaultContactCountry();
 
+    // If we requested a log file download
+    $download = CRM_Utils_Request::retrieve('download', 'String', CRM_Core_DAO::$_nullObject, FALSE, 'tmp', 'GET');
+    if ($download == '1') {
+      CRM_Utils_Normalize::downloadLogFile(self::LOG_FILE);
+      return;
+    }
+
     $state = CRM_Utils_Request::retrieve('state', 'String', CRM_Core_DAO::$_nullObject, FALSE, 'tmp', 'GET');
     if ($state == 'done') {
       $stats = $this->_settings['normalization_stats'];
       $this->assign('stats', $stats);
+    }
+    $log = CRM_Utils_Request::retrieve('log', 'String', CRM_Core_DAO::$_nullObject, FALSE, 'tmp', 'GET');
+    if ($log == '1') {
+      $this->assign('log', 1);
     }
   }
 
@@ -97,7 +109,11 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
       'dry_run',
       ts('Dry Run (Don\'t actually make any changes)')
     );
-    $this->addFormRule(array('CRM_Admin_Form_Setting_Normalize', 'formRule'));    
+    $this->add('checkbox',
+      'log_file',
+      ts('Create Log File of changes')
+    );
+    $this->addFormRule(array('CRM_Admin_Form_Setting_Normalize', 'formRule'));
     
     
     $this->addButtons(array(
@@ -152,17 +168,21 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
       $fromContactId = $params['from_contact_id'];
       $toContactId = $params['to_contact_id'];
       $batchSize = $params['batch_size'];
+      $dryRun = FALSE;
       if (!empty($params['dry_run'])) {
         $dryRun = TRUE;
       }
-      else {
-        $dryRun = FALSE;
+      $logFile = NULL;
+      if (!empty($params['log_file'])) {
+        $logFile = self::LOG_FILE;
+        // Delete any existing log file
+        CRM_Utils_Normalize::deleteLogFile($logFile);
       }
       if (empty($fromContactId) || empty($toContactId)) {
         CRM_Core_Session::setStatus(ts('No contact has been updated'));
         return true;
       }
-      $runner = self::getRunner( false, $fromContactId, $toContactId, $batchSize, $dryRun);
+      $runner = self::getRunner( false, $fromContactId, $toContactId, $batchSize, $dryRun, $logFile);
       if ($runner) {
         // Run Everything in the Queue via the Web.
         $runner->runAllViaWeb();
@@ -204,12 +224,19 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
       $queue->createItem($task);
     }
 
+    // Set end (GET) parameters
+    $endParams = self::END_PARAMS;
+    if (!empty($logFile)) {
+      // Use this flag to show log file link
+      $endParams .= '&log=1';
+    }
+
     // Setup the Runner
     $runnerParams = array(
       'title' => ts('Contact Normalization'),
       'queue' => $queue,
       'errorMode'=> CRM_Queue_Runner::ERROR_ABORT,
-      'onEndUrl' => CRM_Utils_System::url(self::END_URL, self::END_PARAMS, TRUE, NULL, FALSE),
+      'onEndUrl' => CRM_Utils_System::url(self::END_URL, $endParams, TRUE, NULL, FALSE),
     );
     // Skip End URL to prevent redirect
     // if calling from cron job

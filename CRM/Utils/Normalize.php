@@ -500,4 +500,48 @@ class CRM_Utils_Normalize {
       file_put_contents($file, $csv.PHP_EOL, FILE_APPEND | LOCK_EX);
     }
   }
+
+  /**
+   * Delete log file if it exists
+   * @param $logFile
+   */
+  static function deleteLogFile($logFile) {
+    $config = CRM_Core_Config::singleton();
+    if (!empty($config->configAndLogDir) && !empty($logFile)) {
+      $file = $config->configAndLogDir . "/$logFile";
+      if (file_exists($file)) {
+        unlink($file);
+      }
+    }
+  }
+
+  static function downloadLogFile($logFile)
+  {
+    $config = CRM_Core_Config::singleton();
+    if (!empty($config->configAndLogDir) && !empty($logFile)) {
+      $fullPath = $config->configAndLogDir . "/$logFile";
+
+      ignore_user_abort(true);
+      set_time_limit(0); // disable the time limit for this script
+
+      if ($fd = fopen($fullPath, "r")) {
+        $fsize = filesize($fullPath);
+        $path_parts = pathinfo($fullPath);
+        $ext = strtolower($path_parts["extension"]);
+            header("Content-type: application/octet-stream");
+            header("Content-Disposition: filename=\"" . $path_parts["basename"] . "\"");
+        header("Content-length: $fsize");
+        header("Cache-control: private"); //use this to open files directly
+        while (!feof($fd)) {
+          $buffer = fread($fd, 2048);
+          echo $buffer;
+        }
+      }
+      fclose($fd);
+      exit;
+    }
+    else {
+      exit;
+    }
+  }
 }
