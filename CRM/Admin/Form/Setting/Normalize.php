@@ -50,7 +50,9 @@ class CRM_Admin_Form_Setting_Normalize extends CRM_Admin_Form_Setting {
     }
     $log = CRM_Utils_Request::retrieve('log', 'String', CRM_Core_DAO::$_nullObject, FALSE, 'tmp', 'GET');
     if ($log == '1') {
-      $this->assign('log', 1);
+      if (CRM_Utils_Normalize::logFileExists(self::LOG_FILE)) {
+        $this->assign('normalizeLog', 1);
+      }
     }
   }
 

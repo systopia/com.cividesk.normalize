@@ -517,6 +517,10 @@ class CRM_Utils_Normalize {
 
   static function downloadLogFile($logFile)
   {
+    if (!self::logFileExists($logFile)) {
+      CRM_Core_Error::statusBounce('Normalize log does not exist!');
+      return false;
+    }
     $config = CRM_Core_Config::singleton();
     if (!empty($config->configAndLogDir) && !empty($logFile)) {
       $fullPath = $config->configAndLogDir . "/$logFile";
@@ -543,5 +547,21 @@ class CRM_Utils_Normalize {
     else {
       exit;
     }
+  }
+
+  /**
+   * Check if log file exists
+   * @param $logFile
+   * @return boolean
+   */
+  static function logFileExists($logFile) {
+    $config = CRM_Core_Config::singleton();
+    if (!empty($config->configAndLogDir) && !empty($logFile)) {
+      $fullPath = $config->configAndLogDir . "/$logFile";
+      if (file_exists($fullPath)) {
+        return true;
+      }
+    }
+    return false;
   }
 }
